@@ -43,12 +43,12 @@ function destroy {
 	done
 }
 
-function external_ip {
-	gcloud compute instances list $1 --format=yaml | grep "^    natIP\:" | cut -d: -f2 | tr -d ' '
+function internal_ip {
+	cat $1 | jq "map({key: .name, value: .networkInterfaces[0].networkIP}) | from_entries | .[\"$2\"]"
 }
 
-function internal_ip {
-	gcloud compute instances list $1 --format=yaml | grep "^  networkIP\:" | cut -d: -f2 | tr -d ' '
+function external_ip {
+	gcloud compute instances list $1 --format=yaml | grep "^    natIP\:" | cut -d: -f2 | tr -d ' '
 }
 
 function try_connect {
@@ -81,6 +81,15 @@ function setup {
 	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 
+	# build an /etc/hosts file for these vms
+	hosts=$(mktemp hosts.XXXXXXXXXX)
+	json=$(mktemp json.XXXXXXXXXX)
+	gcloud compute instances list --format=json >$json
+	for name in $names; do
+		internal_ip=$(internal_ip $json $name)
+		entry="$internal_ip $name.$ZONE.$PROJECT" >>$hosts
+	done
+
 	for name in $names; do
 		hostname="$name.$ZONE.$PROJECT"
 		# Add the remote ip to the local /etc/hosts
@@ -88,11 +97,10 @@ function setup {
 		try_connect $hostname
 
 		# Add the local ips to the remote /etc/hosts
-		for othername in $names; do
-			entry="$(internal_ip $othername) $othername.$ZONE.$PROJECT"
-			ssh -t "$hostname" "sudo -- sh -c \"echo \\\"$entry\\\" >>/etc/hosts\""
-		done
+		cat $hosts | ssh -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
 	done
+
+	rm $hosts $json
 }
 
 function make_template {
@@ -107,14 +115,17 @@ function make_template {
 function hosts {
 	hosts=
 	args=
+	json=$(mktemp json.XXXXXXXXXX)
+	gcloud compute instances list --format=json >$json
 	for name in $(vm_names); do
 		hostname="$name.$ZONE.$PROJECT"
 		hosts="$hostname $hosts"
-		args="--add-host=$hostname:$(internal_ip $name) $args"
+		args="--add-host=$hostname:$(internal_ip $json $name) $args"
 	done
 	export SSH=ssh
 	export HOSTS="$hosts"
 	export WEAVE_DOCKER_ARGS="$args"
+	rm $json
 }
 
 case "$1" in
