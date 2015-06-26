@@ -42,7 +42,7 @@ func main() {
 	}
 
 	if c.WithDNS && c.WithoutDNS {
-		Error.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
+		Log.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
 	}
 
 	if debug {
@@ -54,7 +54,7 @@ func main() {
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
-		Error.Fatalf("Could not start proxy: %s", err)
+		Log.Fatalf("Could not start proxy: %s", err)
 	}
 
 	p.ListenAndServe()
