@@ -41,6 +41,7 @@ func main() {
 		wait         int
 		debug        bool
 		pktdebug     bool
+		loglevel     string
 		prof         string
 		bufSzMB      int
 		noDiscovery  bool
@@ -60,6 +61,7 @@ func main() {
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
+	flag.StringVar(&loglevel, "loglevel", "", "choose logging level (debug, info, warning, error")
 	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
@@ -73,7 +75,7 @@ func main() {
 	flag.Parse()
 	peers = flag.Args()
 
-	InitDefaultLogging(debug)
+	InitDefaultLoggingOrDie(debug, loglevel)
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)

@@ -62,3 +62,24 @@ func InitDefaultLogging(debug bool) {
 	}
 	InitLogging(level)
 }
+
+func SetLogLevel(levelname string) error {
+	level, err := logrus.ParseLevel(levelname)
+	if err != nil {
+		return err
+	}
+	InitLogging(level)
+	return nil
+}
+
+// Combination of InitDefaultLogging and SetLogLevel, for convenience
+// of existing programs that support both options
+func InitDefaultLoggingOrDie(debug bool, loglevel string) {
+	if loglevel != "" {
+		if err := SetLogLevel(loglevel); err != nil {
+			Log.Fatal(err)
+		}
+	} else {
+		InitDefaultLogging(debug)
+	}
+}
