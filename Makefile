@@ -55,7 +55,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go com
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go gossipdns/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 

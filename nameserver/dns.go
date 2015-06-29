@@ -95,8 +95,8 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-// shuffleAnswers reorders answers for very basic load balancing
-func shuffleAnswers(answers []dns.RR) []dns.RR {
+// ShuffleAnswers reorders answers for very basic load balancing
+func ShuffleAnswers(answers []dns.RR) []dns.RR {
 	if len(answers) > 1 {
 		for i := range answers {
 			j := rand.Intn(i + 1)

@@ -12,7 +12,7 @@ type Peers struct {
 	sync.RWMutex
 	ourself *LocalPeer
 	table   map[PeerName]*Peer
-	onGC    func(*Peer)
+	onGC    []func(*Peer)
 }
 
 type UnknownPeerError struct {
@@ -43,7 +43,13 @@ func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
-		onGC:    onGC}
+		onGC:    []func(*Peer){onGC}}
+}
+
+func (peers *Peers) OnGC(callback func(*Peer)) {
+	peers.Lock()
+	defer peers.Unlock()
+	peers.onGC = append(peers.onGC, callback)
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
@@ -186,7 +192,9 @@ func (peers *Peers) garbageCollect() []*Peer {
 	for name, peer := range peers.table {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.table, name)
-			peers.onGC(peer)
+			for _, callback := range peers.onGC {
+				callback(peer)
+			}
 			removed = append(removed, peer)
 		}
 	}

@@ -333,7 +333,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 				return
 			}
 			if reply != nil {
-				reply.Answer = pruneAnswers(shuffleAnswers(reply.Answer), s.maxAnswers)
+				reply.Answer = pruneAnswers(ShuffleAnswers(reply.Answer), s.maxAnswers)
 				Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
 					r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
 				w.WriteMsg(reply)
@@ -359,7 +359,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 			m := msgBuilder(r, &q, answers, s.localTTL)
 			m.Authoritative = true
 			maybeCache(m, nullTTL, 0)
-			m.Answer = pruneAnswers(shuffleAnswers(m.Answer), s.maxAnswers)
+			m.Answer = pruneAnswers(ShuffleAnswers(m.Answer), s.maxAnswers)
 			Debug.Printf("[dns msgid %d] Sending response: %s/%d answers [code:%s]",
 				m.MsgHdr.Id, dns.TypeToString[q.Qtype], len(m.Answer), dns.RcodeToString[m.Rcode])
 			w.WriteMsg(m)
