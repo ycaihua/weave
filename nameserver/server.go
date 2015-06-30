@@ -279,9 +279,6 @@ func (s *DNSServer) Stop() error {
 // We must create two DNS request multiplexers, depending on the protocol used by
 // clients (as we use the same protocol for asking upstream servers)
 func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
-	failFallback := func(w dns.ResponseWriter, r *dns.Msg) {
-		w.WriteMsg(makeDNSFailResponse(r))
-	}
 	notUsHandler := s.notUsHandler(proto)
 	notUsFallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		Info.Printf("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
@@ -291,7 +288,7 @@ func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
 	// create the multiplexer
 	m := dns.NewServeMux()
 	m.HandleFunc(s.Zone.Domain(), s.localHandler(proto, "Query", dns.TypeA,
-		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failFallback))
+		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failHandleFunc))
 	m.HandleFunc(RDNSDomain, s.localHandler(proto, "Reverse query", dns.TypePTR,
 		s.Zone.DomainLookupInaddr, makePTRReply, s.Zone.ObserveInaddr, notUsFallback))
 	m.HandleFunc(".", s.notUsHandler(proto))
@@ -372,8 +369,18 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 	dnsClient := proto.GetNewClient(DefaultUDPBuflen, s.timeout)
 
+	localNameResolver := s.localHandler(proto, "Query", dns.TypeA,
+		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failHandleFunc)
+
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
+
+		// Short names (eg, "redis.") will follow a local resolution process
+		if q.Qtype == dns.TypeA && nameNumComponents(q.Name) == 1 {
+			Debug.Printf("[dns msgid %d] Short name '%s' -> resolving locally", r.MsgHdr.Id, q.Name)
+			localNameResolver(w, r)
+			return
+		}
 
 		// announce our max payload size as the max payload our client supports
 		maxLen := getMaxReplyLen(r, proto)
