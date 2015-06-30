@@ -6,12 +6,16 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/address"
 )
+
+const reverseDNSdomain = "in-addr.arpa."
 
 type DNSServer struct {
 	ns      *Nameserver
@@ -63,11 +67,23 @@ func (d *DNSServer) Stop() error {
 	return nil
 }
 
+func badDNSRequest(r *dns.Msg, w dns.ResponseWriter) {
+	m := dns.Msg{}
+	m.SetReply(r)
+	m.RecursionAvailable = true
+	m.Rcode = dns.RcodeNameError
+
+	if err := w.WriteMsg(&m); err != nil {
+		common.Info.Printf("err: %v", err)
+	}
+}
+
 func (d *DNSServer) createMux() *dns.ServeMux {
 	m := dns.NewServeMux()
 	m.HandleFunc(d.domain, func(w dns.ResponseWriter, req *dns.Msg) {
 		common.Info.Printf("dns request: %+v", *req)
 		if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypeA {
+			badDNSRequest(req, w)
 			return
 		}
 
@@ -94,11 +110,56 @@ func (d *DNSServer) createMux() *dns.ServeMux {
 		shuffleAnswers(&response.Answer)
 
 		common.Info.Printf("dns response: %+v", response)
-		err := w.WriteMsg(&response)
-		if err != nil {
+		if err := w.WriteMsg(&response); err != nil {
 			common.Info.Printf("err: %v", err)
 		}
 	})
+
+	m.HandleFunc(reverseDNSdomain, func(w dns.ResponseWriter, req *dns.Msg) {
+		common.Info.Printf("dns request: %+v", *req)
+		if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypePTR {
+			badDNSRequest(req, w)
+			return
+		}
+
+		ipStr := strings.TrimSuffix(req.Question[0].Name, "."+reverseDNSdomain)
+		common.Info.Printf("")
+
+		ip, err := address.ParseIP(ipStr)
+		if err != nil {
+			badDNSRequest(req, w)
+			return
+		}
+
+		hostname, err := d.ns.ReverseLookup(ip.Reverse())
+		if err != nil {
+			badDNSRequest(req, w)
+			return
+		}
+
+		response := dns.Msg{}
+		response.RecursionAvailable = true
+		response.Authoritative = true
+		response.SetReply(req)
+
+		header := &dns.RR_Header{
+			Name:   hostname,
+			Rrtype: dns.TypePTR,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(60),
+		}
+
+		response.Answer = []dns.RR{&dns.PTR{
+			Hdr: *header,
+			Ptr: hostname,
+		}}
+
+		common.Info.Printf("dns response: %+v", response)
+		if err := w.WriteMsg(&response); err != nil {
+			common.Info.Printf("err: %v", err)
+		}
+	})
+
 	return m
 }
 

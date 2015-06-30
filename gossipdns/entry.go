@@ -127,6 +127,15 @@ func (es Entries) lookup(hostname string) Entries {
 	return es[i : i+j]
 }
 
+func (es *Entries) first(f func(*Entry) bool) (*Entry, error) {
+	for _, e := range *es {
+		if f(&e) {
+			return &e, nil
+		}
+	}
+	return nil, fmt.Errorf("Not found")
+}
+
 func (es *Entries) Merge(other router.GossipData) {
 	if err := es.merge(*other.(*Entries)); err != nil {
 		panic(err)

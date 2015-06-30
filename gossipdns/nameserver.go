@@ -83,6 +83,19 @@ func (n *Nameserver) Lookup(hostname string) []address.Address {
 	return result
 }
 
+func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
+	n.RLock()
+	defer n.RUnlock()
+
+	match, err := n.entries.first(func(e *Entry) bool {
+		return e.Addr == ip
+	})
+	if err != nil {
+		return "", err
+	}
+	return match.Hostname, nil
+}
+
 func (n *Nameserver) ContainerDied(ident string) error {
 	n.Lock()
 	defer n.Unlock()
