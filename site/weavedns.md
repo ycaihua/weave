@@ -49,10 +49,12 @@ root@ubuntu:/# ping pingme
 ...
 ```
 
-If both hostname and container name are specified at the same time the
-hostname takes precedence; in this circumstance if the hostname is not
-in the weaveDNS domain the container will not be registered, but will
-still use weaveDNS for resolution.
+<div class="alert alert-warning">
+**Please note** if both hostname and container name are specified at
+the same time the hostname takes precedence; in this circumstance if
+the hostname is not in the weaveDNS domain the container will *not* be
+registered, but will still use weaveDNS for resolution.
+</div>
 
 It is also possible to force or forbid an application container's use
 of weaveDNS with the `--with-dns` and `--without-dns` options to
